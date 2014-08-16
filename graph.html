@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Random graph examples by JavaScript</title>
+</head>
+<body>
+    <h1>Random graph examples by JavaScript</h1>
+
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script type="text/javascript" src="raphael-min.js">/* v2.1.2, Jul 6, 2014 */</script>
+    <script type="text/javascript" src="jquery.sprintf.js">/* Jul 6, 2014 */</script>
+    <script type="text/javascript">
+    function randInt(n) { return Math.floor(Math.random() * n); }
+    function deg(th) { return 180 * th / Math.PI; }
+    function rad(d) { return Math.PI * d / 180; }
+
+    function drawArrow(raph, xB, yB, xE, yE) {
+        var th = Math.atan2(yE - yB, xE - xB),
+            phi = rad(20), th1 = th + phi + Math.PI, th2 = th - phi + Math.PI;
+        var arSz = 10;
+        xB += arSz * Math.cos(th + Math.PI / 4);
+        xE += arSz * -Math.cos(th - Math.PI / 4);
+        yB += arSz * Math.sin(th + Math.PI / 4);
+        yE += arSz * -Math.sin(th - Math.PI / 4);
+        var aLx = xE + arSz * Math.cos(th1), aLy = yE + arSz * Math.sin(th1),
+            aRx = xE + arSz * Math.cos(th2), aRy = yE + arSz * Math.sin(th2);
+        raph.path($.sprintf("M%d %dL%d %d", xB, yB, xE, yE)).attr({ stroke: "blue", fill: "none", "stroke-width": 2, "stroke-opacity": 0.4 });
+        raph.path($.sprintf("M%d %dL%d %dL%d %d", xE, yE, aLx, aLy, aRx, aRy)).attr({ stroke: "none", fill: "blue" });
+    }
+
+    var raph1 = null;
+    function gen1(nVerts, nEdges) {
+        if (null != raph1)
+            raph1.remove();
+        raph1 = Raphael("graph1", 800, 500);
+        var cx = 400, cy = 250;
+//      raph1.circle(10, 30, 5).attr({ stroke: "none", fill: "blue" });
+
+        var vertices = Array(nVerts);
+        for (var i = 0; i < nVerts; ++i) {
+            var th = 2 * Math.PI * i / nVerts + Math.PI / 2;
+            vertices[i] = { x: cx - 0.9 * cx * Math.cos(th), y: cy - 0.9 * cy * Math.sin(th) };
+        }
+        for (var i = 0; i < nVerts; ++i) {
+            var v = vertices[i];
+            raph1.circle(v.x, v.y, 10).attr({ stroke: "none", fill: "red" });
+            raph1.text(v.x, v.y, String(i)).attr({ font: "16px 'sans'", "font-weight": "bold", stroke: "none", fill: "white" });
+        }
+
+        var nEdges = Math.min(2 * nVerts * (nVerts - 1) / 2, nEdges);
+        var edges = Array(), adjMat = Array(nVerts);
+        for (var i = 0; i < nVerts; ++i)
+            adjMat[i] = Array(nVerts);
+        var cnt = 0;
+        for (var i = 0; i < 10000; ++i) {
+            var i = randInt(nVerts), j = randInt(nVerts);
+            if (i == j) continue;
+//          console.log($.sprintf("i==%d j==%d", i, j));
+            if (undefined === adjMat[i][j]) {
+                edges.push({ from: i, to: j });
+                adjMat[i][j] = 1;
+                if (++cnt >= nEdges)
+                    break;
+            }
+        }
+        if (10000 == i)
+            alert("OMG");
+
+//      console.log(JSON.stringify(edges));
+        for (var i = 0; i < nEdges; ++i) {
+            var e = edges[i];
+            var vi = vertices[e.from], vj = vertices[e.to];
+//          raph1.path($.sprintf("M%d %dL%d %d", vi.x, vi.y, vj.x, vj.y)).attr({ stroke: "blue", fill: "none" });
+            drawArrow(raph1, vi.x, vi.y, vj.x, vj.y);
+        }
+
+        raph1.vertices = vertices;
+        raph1.adjMat = adjMat;
+        raph1.edges = edges;
+    }
+
+    function run1() {
+        var vertices = raph1.vertices, nVerts = vertices.length,
+            adjMat = $.extend(true, [], raph1.adjMat); // deep copying
+
+        // Demetrescu-Finocchi 2003
+
+        function findCycle(tryIdx) {
+            function dfs(i, chain) {
+                for (var j = 0; j < nVerts; ++j) {
+                    if (adjMat[i][j]) {
+                        var found = chain.indexOf(j)
+                        chain.push(j);
+                        if (0 <= found)
+                            return chain.slice(found);
+                        var recurRes = dfs(j, chain);
+                        if (recurRes.length)
+                            return recurRes;
+                    }
+                }
+                return [];
+            }
+            return dfs(tryIdx, []);
+        }
+
+        var nonTrivial = false;
+        var cycle = [];
+        for (var i = 0; i < nVerts; ++i)
+            if (cycle = findCycle(i)) {
+                nonTrivial = true;
+                break;
+            }
+
+        if (cycle.length) {
+            var F = [];
+        }
+
+        if ( ! nonTrivial)
+            alert("trivial case");
+    }
+
+    $(function() {
+        function p11() {
+            var v = Number($("#param1-1").val());
+            if (30 < v) {
+                alert("#verts must be at most 30");
+                v = 30;
+                $("#param1-1").val(v);
+            }
+            return v;
+        }
+        function p12() { return Number($("#param1-2").val()); }
+        $("#gen1").click(function(e) {
+            e.preventDefault();
+            gen1(p11(), p12());
+        });
+        $("#run1").click(function(e) {
+            e.preventDefault();
+            run1();
+        });
+        gen1(p11(), p12());
+
+    });
+    </script>
+    <style type="text/css">
+        form input, form button { margin-right: 1ex; }
+        hr { margin-top: 3em; margin-bottom: 1em; }
+        footer div { float: left; }
+        address { float: right; }
+
+        #run1 { display: none; }
+    </style>
+
+    <h2>Graph 1</h2>
+    <div id="graph1"></div>
+
+    <form>
+        <label for="param1-1">#verts:</label><input type="number" id="param1-1" value="5" />
+        <label for="param1-2">#edges:</label><input type="number" id="param1-2" value="12" />
+        <button type="button" id="gen1">Generate a new graph</button>
+        <button type="button" id="run1">Run</button>
+    </form>
+
+    <footer>
+        <hr>
+        <div>
+        Many thanks to
+        <ul>
+            <li><a href="http://raphaeljs.com">Raphaël</a> for vector graphics</li>
+            <li><a href="http://jquery.com/">jQuery</a> for UI management</li>
+            <li><a href="https://github.com/azatoth/jquery-sprintf">github.com/azatoth/jquery-sprintf</a></li>
+        </ul>
+        </div>
+        <address>NODA, Kai <a href="http://nodakai.github.io/">nodakai.github.io</a></address>
+    </footer>
+</body>
+</html>
